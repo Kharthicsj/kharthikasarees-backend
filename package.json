@@ -12,14 +12,17 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "axios": "^1.7.2",
     "bcrypt": "^5.1.1",
     "body-parser": "^1.20.2",
+    "Buffer": "^0.0.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-session": "^1.18.0",
     "googleapis": "^135.0.0",
+    "http-proxy-middleware": "^3.0.0",
     "node-fetch": "^3.3.2",
     "nodemailer": "^6.9.13",
     "nodemon": "^3.1.2",
@@ -28,7 +31,10 @@
     "passport-google-oauth2": "^0.2.0",
     "passport-local": "^1.0.0",
     "pg": "^8.11.5",
+    "razorpay": "^2.9.4",
     "session": "^0.1.0",
+    "sha256": "^0.2.0",
+    "uniqid": "^5.4.0",
     "uuid": "^9.0.1"
   }
 }
