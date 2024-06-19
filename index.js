@@ -67,7 +67,7 @@ app.get('/', (req,res) => {
   res.send('Backend Working');
 });
 
-passport.use(
+/* passport.use(
   "google",
   new GoogleStrategy(
     {
@@ -143,7 +143,7 @@ app.get("/google/callback", (req, res, next) => {
       return res.redirect("http://localhost:3000/");
     }
   })(req, res, next);
-});
+}); */
 
 // Signup route
 app.post("/signup", async (req, res) => {
