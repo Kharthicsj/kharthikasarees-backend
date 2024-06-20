@@ -16,7 +16,7 @@ import crypto from "crypto";
 env.config();
 
 const app = express();
-const allowedOrigins = ["http://localhost:3000"];
+const allowedOrigins = ["http://localhost:3000","https://kharthikasarees.onrender.com","https://kharthikasarees.com"];
 
 app.use(
   cors({
