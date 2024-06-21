@@ -375,7 +375,7 @@ app.post("/pay", async function (req, res) {
       merchantUserId: 'MUID' + '1100',
       name: 'kharthic',
       amount: 100, // amount in paise
-      redirectUrl: `https://kharthikasarees.com/order-successful?merchantTransactionId=${merchantTransactionId}`,
+      redirectUrl: `https://kharthikasarees.com/order-successful`,
       redirectMode: 'POST',
       mobileNumber: 8903443449,
       paymentInstrument: {
