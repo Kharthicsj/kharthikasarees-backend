@@ -376,7 +376,7 @@ app.post("/pay", async function (req, res) {
       name: 'kharthic',
       amount: 100, // amount in paise
       redirectUrl: `https://kharthikasarees.com/order-successful`,
-      redirectMode: 'POST',
+      redirectMode: 'GET',
       mobileNumber: 8903443449,
       paymentInstrument: {
         type: 'PAY_PAGE'
