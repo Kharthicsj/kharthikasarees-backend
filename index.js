@@ -16,7 +16,7 @@ import crypto from "crypto";
 env.config();
 
 const app = express();
-const allowedOrigins = ["http://localhost:3000","https://kharthikasarees.onrender.com","https://kharthikasarees.com"];
+const allowedOrigins = ["http://localhost:3000"];
 
 app.use(
   cors({
@@ -63,11 +63,9 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.get('/', (req,res) => {
-  res.send('Backend Working');
-});
+/*
 
-/* passport.use(
+passport.use(
   "google",
   new GoogleStrategy(
     {
@@ -143,7 +141,9 @@ app.get("/google/callback", (req, res, next) => {
       return res.redirect("http://localhost:3000/");
     }
   })(req, res, next);
-}); */
+});
+
+*/
 
 // Signup route
 app.post("/signup", async (req, res) => {
@@ -375,7 +375,7 @@ app.post("/pay", async function (req, res) {
       merchantUserId: 'MUID' + '1100',
       name: 'kharthic',
       amount: 100, // amount in paise
-      redirectUrl: `http://localhost:3000`,
+      redirectUrl: `https://kharthikasarees.com/order-successful`,
       redirectMode: 'POST',
       mobileNumber: 8903443449,
       paymentInstrument: {
@@ -464,6 +464,93 @@ app.get("/status/:txnId", async function (req, res) {
   }
 });
 
+
+app.post("/order-successful", async (req, res) => {
+  const { email, cartItems, merchantTransactionId } = req.body;
+
+  try {
+    // Verify the payment status using merchantTransactionId
+    const verify_URL = `https://api.phonepe.com/apis/hermes/pg/v1/status/${process.env.MERCHANT_ID}/${merchantTransactionId}`;
+    const string = verify_URL + process.env.SALT_KEY;
+    const sha256 = crypto.createHash('sha256').update(string).digest('hex');
+    const checksum = sha256 + '###' + 1;
+
+    const options = {
+      method: 'get',
+      url: verify_URL,
+      headers: {
+        accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-VERIFY': checksum
+      }
+    };
+
+    const paymentResponse = await axios.request(options);
+    const paymentStatus = paymentResponse.data.data.paymentState;
+
+    if (paymentStatus !== 'SUCCESS') {
+      return res.status(400).send({ message: 'Payment not successful', success: false });
+    }
+
+    const result = await db.query(
+      "SELECT firstname, lastname, email, address, city, state, pincode, phonenumber FROM users WHERE email = $1",
+      [email]
+    );
+
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+
+      const transactionId = uuidv4();
+      const userEmailContent = `
+        Hi ${user.firstname},
+        Your order has been placed successfully. Here are the details:
+        Transaction ID: ${transactionId}
+        Cart Items: ${cartItems.map(item => item.name).join(', ')}
+      `;
+
+      const adminEmailContent = `
+        New order received from ${user.firstname} ${user.lastname}.
+        Email: ${user.email}
+        Address: ${user.address}, ${user.city}, ${user.state} - ${user.pincode}
+        Phone: ${user.phonenumber}
+        Transaction ID: ${transactionId}
+        Cart Items: ${cartItems.map(item => item.name).join(', ')}
+      `;
+
+      // Configure Nodemailer
+      const transporter = nodemailer.createTransport({
+        service: 'Gmail',
+        auth: {
+          user: process.env.EMAIL,
+          pass: process.env.EMAIL_PASSWORD,
+        },
+      });
+
+      // Send email to user
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: user.email,
+        subject: 'Order Placed Successfully',
+        text: userEmailContent,
+      });
+
+      // Send email to admin
+      await transporter.sendMail({
+        from: process.env.EMAIL,
+        to: 'kharthikasarees@gmail.com',
+        subject: 'New Order Received',
+        text: adminEmailContent,
+      });
+
+      res.status(200).json({ transactionId });
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  } catch (err) {
+    console.error("Error fetching user data:", err);
+    res.status(500).json({ error: "An error occurred while fetching user data" });
+  }
+});
 
 // Listen on port 4000
 const port = 4000;
