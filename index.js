@@ -477,11 +477,12 @@ app.post("/order-successful", async (req, res) => {
 
     const options = {
       method: 'get',
-      url: verify_URL,
+      url: `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${merchantTransactionId}`,
       headers: {
         accept: 'application/json',
         'Content-Type': 'application/json',
-        'X-VERIFY': checksum
+        'X-VERIFY': checksum,
+        'X-MERCHANT-ID': merchantId
       }
     };
 
