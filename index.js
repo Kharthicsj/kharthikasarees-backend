@@ -461,7 +461,7 @@ app.get("/status/:txnId", async function (req, res) {
 });
 
 //OrderSuccess Endpoint
-app.get('/order-successful', async (req, res) => {
+app.post('/order-successful', async (req, res) => {
   const { transactionId, cart, userEmail } = req.body;
 
   if (!transactionId || !cart || !userEmail) {
@@ -482,14 +482,29 @@ app.get('/order-successful', async (req, res) => {
     // Send confirmation emails
     await sendOrderEmails(user, orderDetails);
 
-    // Render the OrderSuccess page with transaction ID
-    res.sendFile(path.join(__dirname, 'path-to-your-react-build', 'index.html'));
+    // Respond with success
+    res.status(200).send('Order processed successfully');
   } catch (error) {
     console.error("Error processing order:", error);
     res.status(500).send('An error occurred while processing your order.');
   }
 });
 
+// Function to fetch user details from database
+const getUserDetails = async (email) => {
+  try {
+    // Replace with your database query to fetch user details
+    // Example: const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
+    // Example result.rows[0] should contain user details
+    const result = { email: 'kharthicsj@gmail.com', firstName: 'Kharthic' }; // Mocked data
+    return result;
+  } catch (err) {
+    console.error("Error fetching user data:", err);
+    throw err;
+  }
+};
+
+// Function to create order details object
 const createOrderDetails = (transactionId, cart, userEmail) => {
   const items = cart.map(item => ({
     name: item.name,
@@ -505,24 +520,7 @@ const createOrderDetails = (transactionId, cart, userEmail) => {
   };
 };
 
-const getUserDetails = async (email) => {
-  try {
-    const result = await db.query(
-      "SELECT firstname, lastname, email, address, city, state, pincode, phonenumber FROM users WHERE email = $1",
-      [email]
-    );
-
-    if (result.rows.length > 0) {
-      return result.rows[0];
-    } else {
-      return null;
-    }
-  } catch (err) {
-    console.error("Error fetching user data:", err);
-    throw err;
-  }
-};
-
+// Function to send order confirmation emails
 const sendOrderEmails = async (user, orderDetails) => {
   const items = orderDetails.items;
   const total = orderDetails.total;
@@ -540,14 +538,14 @@ const sendOrderEmails = async (user, orderDetails) => {
     from: process.env.EMAIL,
     to: user.email,
     subject: 'Order Confirmation - Kharthika Sarees',
-    text: `Hello ${user.firstname} ${user.lastname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}\n\nPhone: ${user.phonenumber}`
+    text: `Hello ${user.firstName},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}`
   };
 
   const adminMailOptions = {
     from: process.env.EMAIL,
     to: 'kharthikasarees@gmail.com',
     subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}\n\nPhone: ${user.phonenumber}`
+    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}`
   };
 
   try {
