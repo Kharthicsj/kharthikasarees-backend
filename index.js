@@ -139,7 +139,7 @@ app.get("/google/callback", (req, res, next) => {
       return res.redirect("http://localhost:3000/");
     }
   })(req, res, next);
-});
+}); */
 
 // Signup route
 app.post("/signup", async (req, res) => {
@@ -178,7 +178,7 @@ app.post("/signup", async (req, res) => {
       .status(500)
       .json({ error: "An error occurred while encrypting password." });
   }
-});*/
+});
 
 // Signin route
 app.post("/signin", async (req, res) => {
