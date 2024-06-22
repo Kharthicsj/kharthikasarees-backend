@@ -461,7 +461,7 @@ app.get("/status/:txnId", async function (req, res) {
 });
 
 //OrderSuccess Endpoint
-app.post('/order-successful', async (req, res) => {
+app.get('/order-successful', async (req, res) => {
   const { transactionId, cart, userEmail } = req.body;
 
   if (!transactionId || !cart || !userEmail) {
