@@ -63,9 +63,7 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-/*
-
-passport.use(
+/*passport.use(
   "google",
   new GoogleStrategy(
     {
@@ -143,8 +141,6 @@ app.get("/google/callback", (req, res, next) => {
   })(req, res, next);
 });
 
-*/
-
 // Signup route
 app.post("/signup", async (req, res) => {
   const { firstname, lastname, email, password } = req.body;
@@ -182,7 +178,7 @@ app.post("/signup", async (req, res) => {
       .status(500)
       .json({ error: "An error occurred while encrypting password." });
   }
-});
+});*/
 
 // Signin route
 app.post("/signin", async (req, res) => {
@@ -375,7 +371,7 @@ app.post("/pay", async function (req, res) {
       merchantUserId: 'MUID' + '1100',
       name: 'kharthic',
       amount: 100, // amount in paise
-      redirectUrl: `https://kharthikasarees.com/order-successful`,
+      redirectUrl: `https://kharthikasarees.com/order-successful?transactionId=${merchantTransactionId}`,
       redirectMode: 'GET',
       mobileNumber: 8903443449,
       paymentInstrument: {
@@ -385,7 +381,7 @@ app.post("/pay", async function (req, res) {
 
     const payload = JSON.stringify(data);
     const payloadMain = Buffer.from(payload).toString('base64');
-    const keyIndex = 1; // use correct key index
+    const keyIndex = 1;
     const string = payloadMain + '/pg/v1/pay' + process.env.SALT_KEY;
     const sha256 = crypto.createHash('sha256').update(string).digest('hex');
     const checksum = sha256 + '###' + keyIndex;
@@ -464,94 +460,111 @@ app.get("/status/:txnId", async function (req, res) {
   }
 });
 
+//OrderSuccess Endpoint
+app.post('/order-successful', async (req, res) => {
+  const { transactionId, cart, userEmail } = req.body;
 
-app.post("/order-successful", async (req, res) => {
-  const { email, cartItems, merchantTransactionId } = req.body;
+  if (!transactionId || !cart || !userEmail) {
+    return res.status(400).send('Missing required fields');
+  }
 
   try {
-    // Verify the payment status using merchantTransactionId
-    const verify_URL = `https://api.phonepe.com/apis/hermes/pg/v1/status/${process.env.MERCHANT_ID}/${merchantTransactionId}`;
-    const string = verify_URL + process.env.SALT_KEY;
-    const sha256 = crypto.createHash('sha256').update(string).digest('hex');
-    const checksum = sha256 + '###' + 1;
+    // Fetch user details from the database
+    const user = await getUserDetails(userEmail);
 
-    const options = {
-      method: 'get',
-      url: `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${merchantTransactionId}`,
-      headers: {
-        accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-VERIFY': checksum,
-        'X-MERCHANT-ID': merchantId
-      }
-    };
-
-    const paymentResponse = await axios.request(options);
-    const paymentStatus = paymentResponse.data.data.paymentState;
-
-    if (paymentStatus !== 'SUCCESS') {
-      return res.status(400).send({ message: 'Payment not successful', success: false });
+    if (!user) {
+      return res.status(404).send('User not found');
     }
 
+    // Create order details
+    const orderDetails = createOrderDetails(transactionId, cart, userEmail);
+
+    // Send confirmation emails
+    await sendOrderEmails(user, orderDetails);
+
+    // Render the OrderSuccess page with transaction ID
+    res.sendFile(path.join(__dirname, 'path-to-your-react-build', 'index.html'));
+  } catch (error) {
+    console.error("Error processing order:", error);
+    res.status(500).send('An error occurred while processing your order.');
+  }
+});
+
+const createOrderDetails = (transactionId, cart, userEmail) => {
+  const items = cart.map(item => ({
+    name: item.name,
+    price: parseFloat(item.price)
+  }));
+  const total = items.reduce((total, item) => total + item.price, 0);
+
+  return {
+    userEmail: userEmail,
+    transactionId: transactionId,
+    items: items,
+    total: total
+  };
+};
+
+const getUserDetails = async (email) => {
+  try {
     const result = await db.query(
       "SELECT firstname, lastname, email, address, city, state, pincode, phonenumber FROM users WHERE email = $1",
       [email]
     );
 
     if (result.rows.length > 0) {
-      const user = result.rows[0];
-
-      const transactionId = uuidv4();
-      const userEmailContent = `
-        Hi ${user.firstname},
-        Your order has been placed successfully. Here are the details:
-        Transaction ID: ${transactionId}
-        Cart Items: ${cartItems.map(item => item.name).join(', ')}
-      `;
-
-      const adminEmailContent = `
-        New order received from ${user.firstname} ${user.lastname}.
-        Email: ${user.email}
-        Address: ${user.address}, ${user.city}, ${user.state} - ${user.pincode}
-        Phone: ${user.phonenumber}
-        Transaction ID: ${transactionId}
-        Cart Items: ${cartItems.map(item => item.name).join(', ')}
-      `;
-
-      // Configure Nodemailer
-      const transporter = nodemailer.createTransport({
-        service: 'Gmail',
-        auth: {
-          user: process.env.EMAIL,
-          pass: process.env.EMAIL_PASSWORD,
-        },
-      });
-
-      // Send email to user
-      await transporter.sendMail({
-        from: process.env.EMAIL,
-        to: user.email,
-        subject: 'Order Placed Successfully',
-        text: userEmailContent,
-      });
-
-      // Send email to admin
-      await transporter.sendMail({
-        from: process.env.EMAIL,
-        to: 'kharthikasarees@gmail.com',
-        subject: 'New Order Received',
-        text: adminEmailContent,
-      });
-
-      res.status(200).json({ transactionId });
+      return result.rows[0];
     } else {
-      res.status(404).json({ error: "User not found" });
+      return null;
     }
   } catch (err) {
     console.error("Error fetching user data:", err);
-    res.status(500).json({ error: "An error occurred while fetching user data" });
+    throw err;
   }
-});
+};
+
+const sendOrderEmails = async (user, orderDetails) => {
+  const items = orderDetails.items;
+  const total = orderDetails.total;
+  const transactionId = orderDetails.transactionId;
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  });
+
+  const userMailOptions = {
+    from: process.env.EMAIL,
+    to: user.email,
+    subject: 'Order Confirmation - Kharthika Sarees',
+    text: `Hello ${user.firstname} ${user.lastname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}\n\nPhone: ${user.phonenumber}`
+  };
+
+  const adminMailOptions = {
+    from: process.env.EMAIL,
+    to: 'kharthikasarees@gmail.com',
+    subject: 'New Order Received - Kharthika Sarees',
+    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}\n\nPhone: ${user.phonenumber}`
+  };
+
+  try {
+    await transporter.sendMail(userMailOptions);
+    console.log('Email sent to user');
+  } catch (error) {
+    console.error('Error sending email to user:', error);
+  }
+
+  try {
+    await transporter.sendMail(adminMailOptions);
+    console.log('Email sent to admin');
+  } catch (error) {
+    console.error('Error sending email to admin:', error);
+  }
+};
+
 
 // Listen on port 4000
 const port = 4000;
