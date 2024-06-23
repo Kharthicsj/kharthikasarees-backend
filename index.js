@@ -547,14 +547,14 @@ const sendOrderEmails = async (user, orderDetails) => {
     from: process.env.EMAIL,
     to: user.email,
     subject: 'Order Confirmation - Kharthika Sarees',
-    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}`,
+    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total},\n\nYou can expect your order to be delivered within 8 days please wait for the order confirmation mail from us.`,
   };
 
   const adminMailOptions = {
     from: process.env.EMAIL,
     to: 'kharthikasarees@gmail.com',
     subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
+    text: `A new order has been placed.\\nUser : ${user.firstname}\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
   };
 
   try {
