@@ -493,11 +493,18 @@ app.post('/order-successful', async (req, res) => {
 // Function to fetch user details from database
 const getUserDetails = async (email) => {
   try {
-    // Replace with your database query to fetch user details
-    // Example: const result = await db.query("SELECT * FROM users WHERE email = $1", [email]);
-    // Example result.rows[0] should contain user details
-    const result = { email: 'kharthicsj@gmail.com', firstName: 'Kharthic' }; // Mocked data
-    return result;
+    const query = `
+      SELECT firstname, lastname, email, address, city, state, pincode, phonenumber 
+      FROM users 
+      WHERE email = $1
+    `;
+    const result = await db.query(query, [email]);
+
+    if (result.rows.length > 0) {
+      return result.rows[0];
+    } else {
+      throw new Error('User not found');
+    }
   } catch (err) {
     console.error("Error fetching user data:", err);
     throw err;
@@ -520,46 +527,52 @@ const createOrderDetails = (transactionId, cart, userEmail) => {
   };
 };
 
+
 // Function to send order confirmation emails
 const sendOrderEmails = async (user, orderDetails) => {
   const items = orderDetails.items;
   const total = orderDetails.total;
   const transactionId = orderDetails.transactionId;
 
+  console.log('Setting up Nodemailer transporter...');
   const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.EMAIL,
-      pass: process.env.EMAIL_PASSWORD
-    }
+      user: process.env.GMAIL_USER,
+      pass: process.env.APP_PASSWORD,
+    },
   });
 
   const userMailOptions = {
     from: process.env.EMAIL,
     to: user.email,
     subject: 'Order Confirmation - Kharthika Sarees',
-    text: `Hello ${user.firstName},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}`
+    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total}`,
   };
 
   const adminMailOptions = {
     from: process.env.EMAIL,
     to: 'kharthikasarees@gmail.com',
     subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}`
+    text: `A new order has been placed.\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
   };
 
   try {
+    console.log('Sending email to user...');
     await transporter.sendMail(userMailOptions);
     console.log('Email sent to user');
   } catch (error) {
     console.error('Error sending email to user:', error);
+    throw error;
   }
 
   try {
+    console.log('Sending email to admin...');
     await transporter.sendMail(adminMailOptions);
     console.log('Email sent to admin');
   } catch (error) {
     console.error('Error sending email to admin:', error);
+    throw error;
   }
 };
 
