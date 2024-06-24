@@ -362,18 +362,17 @@ app.get("/api/user", async (req, res) => {
 app.post("/pay", async function (req, res) {
   try {
     console.log(req.body);
-    const { user_id, price, phone, name } = req.body;
-    const merchantTransactionId = 'M' + Date.now();
+    const { name, amount, number, MID, transactionId } = req.body;
 
     const data = {
       merchantId: process.env.MERCHANT_ID,
-      merchantTransactionId: merchantTransactionId,
-      merchantUserId: 'MUID' + '1100',
-      name: 'kharthic',
-      amount: 100, // amount in paise
-      redirectUrl: `https://kharthikasarees.com/order-successful?transactionId=${merchantTransactionId}`,
+      merchantTransactionId: transactionId,
+      merchantUserId: MID,
+      name: name,
+      amount: amount, // amount in paise
+      redirectUrl: `https://kharthikasarees.com/order-successful?transactionId=${transactionId}`,
       redirectMode: 'GET',
-      mobileNumber: 8903443449,
+      mobileNumber: number,
       paymentInstrument: {
         type: 'PAY_PAGE'
       }
