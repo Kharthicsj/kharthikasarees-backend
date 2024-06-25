@@ -1,4 +1,4 @@
-import express, { request } from "express";
+import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import pg from "pg";
@@ -553,7 +553,7 @@ const sendOrderEmails = async (user, orderDetails) => {
     from: process.env.EMAIL,
     to: 'kharthikasarees@gmail.com',
     subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\\nUser : ${user.firstname}\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
+    text: `A new order has been placed.\n\nUser : ${user.firstname}\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
   };
 
   try {
@@ -575,6 +575,25 @@ const sendOrderEmails = async (user, orderDetails) => {
   }
 };
 
+app.post('/newsletter', async (req, res) => {
+  const { email } = req.body;  
+  try {
+    const checkEmailQuery = 'SELECT * FROM newsletter WHERE email = $1';
+    const checkEmailResult = await db.query(checkEmailQuery, [email]);
+
+    if (checkEmailResult.rows.length > 0) {
+      return res.status(200).json({ error: 'User already registered to the newsletter.' });
+    }
+
+    const insertQuery = 'INSERT INTO newsletter (email) VALUES ($1)';
+    await db.query(insertQuery, [email]);
+
+    return res.status(200).json({ success: 'Successfully subscribed to the newsletter!' });
+  } catch (error) {
+    console.error('Error inserting data into newsletter table:', error);
+    return res.status(500).json({ message: 'Failed to subscribe. Please try again.' });
+  }
+});
 
 // Listen on port 4000
 const port = 4000;
