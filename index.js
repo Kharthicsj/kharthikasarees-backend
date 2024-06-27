@@ -463,7 +463,15 @@ app.get("/status/:txnId", async function (req, res) {
 app.post('/order-successful', async (req, res) => {
   const { transactionId, cart, userEmail } = req.body;
 
-  if (!transactionId || !cart || !userEmail) {
+  const itemsWithIds = cart.map(item => ({
+    name: item.name,
+    price: parseFloat(item.price),
+    productId: item.id  // Assuming id is the field name in your cart items
+  }));
+
+  console.log(itemsWithIds); // Log items with IDs for verification
+
+  if (!transactionId || !itemsWithIds || !userEmail) {
     return res.status(400).send('Missing required fields');
   }
 
@@ -475,10 +483,13 @@ app.post('/order-successful', async (req, res) => {
       return res.status(404).send('User not found');
     }
 
-    // Create order details
-    const orderDetails = createOrderDetails(transactionId, cart, userEmail);
+    // Create order details including IDs
+    const orderDetails = createOrderDetails(transactionId, itemsWithIds, user);
 
-    // Send confirmation emails
+    // Save order details to the database
+    await saveOrder(orderDetails);
+
+    // Send confirmation emails with IDs
     await sendOrderEmails(user, orderDetails);
 
     // Respond with success
@@ -511,21 +522,51 @@ const getUserDetails = async (email) => {
 };
 
 // Function to create order details object
-const createOrderDetails = (transactionId, cart, userEmail) => {
+const createOrderDetails = (transactionId, cart, user) => {
   const items = cart.map(item => ({
     name: item.name,
-    price: parseFloat(item.price)
+    price: parseFloat(item.price),
+    productId: item.productId // Assuming cart items have productId
   }));
   const total = items.reduce((total, item) => total + item.price, 0);
 
   return {
-    userEmail: userEmail,
+    user: user,
     transactionId: transactionId,
     items: items,
     total: total
   };
 };
 
+// Function to save order details into the database
+const saveOrder = async (orderDetails) => {
+  try {
+    const query = `
+      INSERT INTO orders (user_firstname, user_lastname, user_email, user_address, user_city, user_state, user_pincode, user_phonenumber, transaction_id, items, total)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ON CONFLICT (transaction_id) DO NOTHING;
+    `;
+    const values = [
+      orderDetails.user.firstname,
+      orderDetails.user.lastname,
+      orderDetails.user.email,
+      orderDetails.user.address,
+      orderDetails.user.city,
+      orderDetails.user.state,
+      orderDetails.user.pincode,
+      orderDetails.user.phonenumber,
+      orderDetails.transactionId,
+      JSON.stringify(orderDetails.items),
+      orderDetails.total
+    ];
+
+    await db.query(query, values);
+    console.log('Order saved to database');
+  } catch (error) {
+    console.error('Error saving order to database:', error);
+    throw error;
+  }
+};
 
 // Function to send order confirmation emails
 const sendOrderEmails = async (user, orderDetails) => {
@@ -546,14 +587,14 @@ const sendOrderEmails = async (user, orderDetails) => {
     from: process.env.EMAIL,
     to: user.email,
     subject: 'Order Confirmation - Kharthika Sarees',
-    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total},\n\nYou can expect your order to be delivered within 8 days please wait for the order confirmation mail from us.`,
+    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total},\n\nYou can expect your order to be delivered within 8 days. Please wait for the order confirmation mail from us.`,
   };
 
   const adminMailOptions = {
     from: process.env.EMAIL,
     to: 'kharthikasarees@gmail.com',
     subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\n\nUser : ${user.firstname}\n\nTransaction ID: ${transactionId}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
+    text: `A new order has been placed.\n\nUser: ${user.firstname}\n\nPhone no: ${user.phonenumber}\n\nTransaction ID: ${transactionId}\nProduct IDs: ${items.map(item => item.productId).join(', ')}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
   };
 
   try {
