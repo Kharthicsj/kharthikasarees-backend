@@ -16,7 +16,11 @@ import crypto from "crypto";
 env.config();
 
 const app = express();
-const allowedOrigins = ["http://localhost:3000","https://kharthikasarees.onrender.com","https://kharthikasarees.com"];
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://kharthikasarees.onrender.com",
+  "https://kharthikasarees.com",
+];
 
 app.use(
   cors({
@@ -42,11 +46,11 @@ const db = new pg.Client({
   },
 });
 
-db.connect(err => {
+db.connect((err) => {
   if (err) {
-    console.error('Connection error', err.stack);
+    console.error("Connection error", err.stack);
   } else {
-    console.log('Connected to the database');
+    console.log("Connected to the database");
   }
 });
 
@@ -62,10 +66,6 @@ app.use(
 );
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.get("/", (req, res) => {
-  res.send("Website is Live");
-});
 
 /*passport.use(
   "google",
@@ -114,6 +114,10 @@ app.get(
     scope: ["profile", "email"],
   })
 );
+
+app.get("/", (req, res) => {
+  res.send("Website is Live");
+});
 
 // Callback route after successful Google authentication
 app.get("/google/callback", (req, res, next) => {
@@ -358,6 +362,42 @@ app.get("/api/user", async (req, res) => {
   }
 });
 
+app.get("/api/get-order-details", async (req, res) => {
+  const { email } = req.query;
+  const fetchQuery = `
+    SELECT 
+      order_id, 
+      user_firstname, 
+      user_lastname, 
+      user_email, 
+      user_address, 
+      user_city, 
+      user_state, 
+      user_pincode, 
+      user_phonenumber, 
+      transaction_id, 
+      items, 
+      total, 
+      order_date 
+    FROM 
+      orders 
+    WHERE 
+      user_email = $1`;
+
+  try {
+    const result = await db.query(fetchQuery, [email]);
+
+    if (result.rows.length > 0) {
+      res.status(200).json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: "User not found" });
+    }
+  } catch (err) {
+    console.error("Error fetching user data:", err);
+    res.status(500).json({ error: "An error occurred while fetching user data" });
+  }
+});
+
 //Online Payment Gateway
 app.post("/pay", async function (req, res) {
   try {
@@ -371,19 +411,19 @@ app.post("/pay", async function (req, res) {
       name: name,
       amount: amount, // amount in paise
       redirectUrl: `https://kharthikasarees.com/order-successful?transactionId=${transactionId}`,
-      redirectMode: 'GET',
+      redirectMode: "GET",
       mobileNumber: number,
       paymentInstrument: {
-        type: 'PAY_PAGE'
-      }
+        type: "PAY_PAGE",
+      },
     };
 
     const payload = JSON.stringify(data);
-    const payloadMain = Buffer.from(payload).toString('base64');
+    const payloadMain = Buffer.from(payload).toString("base64");
     const keyIndex = 1;
-    const string = payloadMain + '/pg/v1/pay' + process.env.SALT_KEY;
-    const sha256 = crypto.createHash('sha256').update(string).digest('hex');
-    const checksum = sha256 + '###' + keyIndex;
+    const string = payloadMain + "/pg/v1/pay" + process.env.SALT_KEY;
+    const sha256 = crypto.createHash("sha256").update(string).digest("hex");
+    const checksum = sha256 + "###" + keyIndex;
 
     console.log("CheckSum : " + checksum);
     console.log("payload : " + payload);
@@ -392,24 +432,27 @@ app.post("/pay", async function (req, res) {
     const prod_URL = "https://api.phonepe.com/apis/hermes/pg/v1/pay";
 
     const options = {
-      method: 'post',
+      method: "post",
       url: prod_URL,
       headers: {
-        accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-VERIFY': checksum
+        accept: "application/json",
+        "Content-Type": "application/json",
+        "X-VERIFY": checksum,
       },
       data: {
-        request: payloadMain
-      }
+        request: payloadMain,
+      },
     };
 
     // Make the request to PhonePe API from your backend
-    axios.request(options)
+    axios
+      .request(options)
       .then(function (response) {
         // Send the redirect URL to the frontend
         console.log(response.data);
-        res.json({ redirectUrl: response.data.data.instrumentResponse.redirectInfo.url });
+        res.json({
+          redirectUrl: response.data.data.instrumentResponse.redirectInfo.url,
+        });
       })
       .catch(function (error) {
         console.error(error);
@@ -423,31 +466,38 @@ app.post("/pay", async function (req, res) {
 // Endpoint to validate payment status
 app.get("/status/:txnId", async function (req, res) {
   try {
-    const merchantTransactionId = req.params['txnId'];
+    const merchantTransactionId = req.params["txnId"];
     const merchantId = process.env.MERCHANT_ID;
     const keyIndex = 1; // use correct key index
-    const string = `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${merchantTransactionId}` + process.env.SALT_KEY;
-    const sha256 = crypto.createHash('sha256').update(string).digest('hex');
+    const string =
+      `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${merchantTransactionId}` +
+      process.env.SALT_KEY;
+    const sha256 = crypto.createHash("sha256").update(string).digest("hex");
     const checksum = sha256 + "###" + keyIndex;
 
     const options = {
-      method: 'GET',
+      method: "GET",
       url: `https://api.phonepe.com/apis/hermes/pg/v1/status/${merchantId}/${merchantTransactionId}`,
       headers: {
-        accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-VERIFY': checksum,
-        'X-MERCHANT-ID': merchantId
-      }
+        accept: "application/json",
+        "Content-Type": "application/json",
+        "X-VERIFY": checksum,
+        "X-MERCHANT-ID": merchantId,
+      },
     };
 
-    axios.request(options)
+    axios
+      .request(options)
       .then(async (response) => {
         if (response.data.success === true) {
           console.log(response.data);
-          return res.status(200).send({ success: true, message: "Payment Success" });
+          return res
+            .status(200)
+            .send({ success: true, message: "Payment Success" });
         } else {
-          return res.status(400).send({ success: false, message: "Payment Failure" });
+          return res
+            .status(400)
+            .send({ success: false, message: "Payment Failure" });
         }
       })
       .catch((err) => {
@@ -460,19 +510,19 @@ app.get("/status/:txnId", async function (req, res) {
 });
 
 //OrderSuccess Endpoint
-app.post('/order-successful', async (req, res) => {
+app.post("/order-successful", async (req, res) => {
   const { transactionId, cart, userEmail } = req.body;
 
-  const itemsWithIds = cart.map(item => ({
+  const itemsWithIds = cart.map((item) => ({
     name: item.name,
     price: parseFloat(item.price),
-    productId: item.id  // Assuming id is the field name in your cart items
+    productId: item.id, // Assuming id is the field name in your cart items
   }));
 
   console.log(itemsWithIds); // Log items with IDs for verification
 
   if (!transactionId || !itemsWithIds || !userEmail) {
-    return res.status(400).send('Missing required fields');
+    return res.status(400).send("Missing required fields");
   }
 
   try {
@@ -480,7 +530,7 @@ app.post('/order-successful', async (req, res) => {
     const user = await getUserDetails(userEmail);
 
     if (!user) {
-      return res.status(404).send('User not found');
+      return res.status(404).send("User not found");
     }
 
     // Create order details including IDs
@@ -493,10 +543,10 @@ app.post('/order-successful', async (req, res) => {
     await sendOrderEmails(user, orderDetails);
 
     // Respond with success
-    res.status(200).send('Order processed successfully');
+    res.status(200).send("Order processed successfully");
   } catch (error) {
     console.error("Error processing order:", error);
-    res.status(500).send('An error occurred while processing your order.');
+    res.status(500).send("An error occurred while processing your order.");
   }
 });
 
@@ -513,7 +563,7 @@ const getUserDetails = async (email) => {
     if (result.rows.length > 0) {
       return result.rows[0];
     } else {
-      throw new Error('User not found');
+      throw new Error("User not found");
     }
   } catch (err) {
     console.error("Error fetching user data:", err);
@@ -523,10 +573,10 @@ const getUserDetails = async (email) => {
 
 // Function to create order details object
 const createOrderDetails = (transactionId, cart, user) => {
-  const items = cart.map(item => ({
+  const items = cart.map((item) => ({
     name: item.name,
     price: parseFloat(item.price),
-    productId: item.productId // Assuming cart items have productId
+    productId: item.productId, // Assuming cart items have productId
   }));
   const total = items.reduce((total, item) => total + item.price, 0);
 
@@ -534,7 +584,7 @@ const createOrderDetails = (transactionId, cart, user) => {
     user: user,
     transactionId: transactionId,
     items: items,
-    total: total
+    total: total,
   };
 };
 
@@ -557,13 +607,13 @@ const saveOrder = async (orderDetails) => {
       orderDetails.user.phonenumber,
       orderDetails.transactionId,
       JSON.stringify(orderDetails.items),
-      orderDetails.total
+      orderDetails.total,
     ];
 
     await db.query(query, values);
-    console.log('Order saved to database');
+    console.log("Order saved to database");
   } catch (error) {
-    console.error('Error saving order to database:', error);
+    console.error("Error saving order to database:", error);
     throw error;
   }
 };
@@ -574,9 +624,9 @@ const sendOrderEmails = async (user, orderDetails) => {
   const total = orderDetails.total;
   const transactionId = orderDetails.transactionId;
 
-  console.log('Setting up Nodemailer transporter...');
+  console.log("Setting up Nodemailer transporter...");
   const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: "gmail",
     auth: {
       user: process.env.GMAIL_USER,
       pass: process.env.APP_PASSWORD,
@@ -586,53 +636,75 @@ const sendOrderEmails = async (user, orderDetails) => {
   const userMailOptions = {
     from: process.env.EMAIL,
     to: user.email,
-    subject: 'Order Confirmation - Kharthika Sarees',
-    text: `Hello ${user.firstname},\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nTotal: ₹${total},\n\nYou can expect your order to be delivered within 8 days. Please wait for the order confirmation mail from us.`,
+    subject: "Order Confirmation - Kharthika Sarees",
+    text: `Hello ${
+      user.firstname
+    },\n\nYour order has been placed successfully. Your transaction ID is ${transactionId}.\n\nItems:\n${items
+      .map((item) => `${item.name}: ₹${item.price}`)
+      .join(
+        "\n"
+      )}\n\nTotal: ₹${total},\n\nYou can expect your order to be delivered within 8 days. Please wait for the order confirmation mail from us.`,
   };
 
   const adminMailOptions = {
     from: process.env.EMAIL,
-    to: 'kharthikasarees@gmail.com',
-    subject: 'New Order Received - Kharthika Sarees',
-    text: `A new order has been placed.\n\nUser: ${user.firstname}\n\nPhone no: ${user.phonenumber}\n\nTransaction ID: ${transactionId}\nProduct IDs: ${items.map(item => item.productId).join(', ')}\nTotal: ₹${total}\n\nItems:\n${items.map(item => `${item.name}: ₹${item.price}`).join('\n')}\n\nShipping Address:\n${user.address}, ${user.city}, ${user.state}, ${user.pincode}`
+    to: "kharthikasarees@gmail.com",
+    subject: "New Order Received - Kharthika Sarees",
+    text: `A new order has been placed.\n\nUser: ${
+      user.firstname
+    }\n\nPhone no: ${
+      user.phonenumber
+    }\n\nTransaction ID: ${transactionId}\nProduct IDs: ${items
+      .map((item) => item.productId)
+      .join(", ")}\nTotal: ₹${total}\n\nItems:\n${items
+      .map((item) => `${item.name}: ₹${item.price}`)
+      .join("\n")}\n\nShipping Address:\n${user.address}, ${user.city}, ${
+      user.state
+    }, ${user.pincode}`,
   };
 
   try {
-    console.log('Sending email to user...');
+    console.log("Sending email to user...");
     await transporter.sendMail(userMailOptions);
-    console.log('Email sent to user');
+    console.log("Email sent to user");
   } catch (error) {
-    console.error('Error sending email to user:', error);
+    console.error("Error sending email to user:", error);
     throw error;
   }
 
   try {
-    console.log('Sending email to admin...');
+    console.log("Sending email to admin...");
     await transporter.sendMail(adminMailOptions);
-    console.log('Email sent to admin');
+    console.log("Email sent to admin");
   } catch (error) {
-    console.error('Error sending email to admin:', error);
+    console.error("Error sending email to admin:", error);
     throw error;
   }
 };
 
-app.post('/newsletter', async (req, res) => {
-  const { email } = req.body;  
+app.post("/newsletter", async (req, res) => {
+  const { email } = req.body;
   try {
-    const checkEmailQuery = 'SELECT * FROM newsletter WHERE email = $1';
+    const checkEmailQuery = "SELECT * FROM newsletter WHERE email = $1";
     const checkEmailResult = await db.query(checkEmailQuery, [email]);
 
     if (checkEmailResult.rows.length > 0) {
-      return res.status(200).json({ error: 'User already registered to the newsletter.' });
+      return res
+        .status(200)
+        .json({ error: "User already registered to the newsletter." });
     }
 
-    const insertQuery = 'INSERT INTO newsletter (email) VALUES ($1)';
+    const insertQuery = "INSERT INTO newsletter (email) VALUES ($1)";
     await db.query(insertQuery, [email]);
 
-    return res.status(200).json({ success: 'Successfully subscribed to the newsletter!' });
+    return res
+      .status(200)
+      .json({ success: "Successfully subscribed to the newsletter!" });
   } catch (error) {
-    console.error('Error inserting data into newsletter table:', error);
-    return res.status(500).json({ message: 'Failed to subscribe. Please try again.' });
+    console.error("Error inserting data into newsletter table:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to subscribe. Please try again." });
   }
 });
 
