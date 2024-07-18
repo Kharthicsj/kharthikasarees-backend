@@ -635,7 +635,7 @@ const sendOrderEmails = async (user, orderDetails) => {
   });
 
   const userMailOptions = {
-    from: process.env.EMAIL,
+    from: process.env.GMAIL_USER,
     to: user.email,
     subject: "Order Confirmation - Kharthika Sarees",
     text: `Hello ${
@@ -648,7 +648,7 @@ const sendOrderEmails = async (user, orderDetails) => {
   };
 
   const adminMailOptions = {
-    from: process.env.EMAIL,
+    from: process.env.GMAIL_USER,
     to: "kharthikasarees@gmail.com",
     subject: "New Order Received - Kharthika Sarees",
     text: `A new order has been placed.\n\nUser: ${
