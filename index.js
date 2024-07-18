@@ -389,7 +389,7 @@ app.get("/api/get-order-details", async (req, res) => {
     const result = await db.query(fetchQuery, [email]);
 
     if (result.rows.length > 0) {
-      res.status(200).json(result.rows[0]);
+      res.status(200).json(result.rows);
     } else {
       res.status(404).json({ error: "User not found" });
     }
