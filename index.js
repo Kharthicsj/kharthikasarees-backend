@@ -67,6 +67,10 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.get("/", (req, res) => {
+  res.send("Website is Live");
+});
+
 /*passport.use(
   "google",
   new GoogleStrategy(
@@ -114,10 +118,6 @@ app.get(
     scope: ["profile", "email"],
   })
 );
-
-app.get("/", (req, res) => {
-  res.send("Website is Live");
-});
 
 // Callback route after successful Google authentication
 app.get("/google/callback", (req, res, next) => {
@@ -378,7 +378,8 @@ app.get("/api/get-order-details", async (req, res) => {
       transaction_id, 
       items, 
       total, 
-      order_date 
+      order_date,
+      status 
     FROM 
       orders 
     WHERE 
