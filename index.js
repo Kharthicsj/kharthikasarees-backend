@@ -67,6 +67,8 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+const otpStore = {};
+
 app.get("/", (req, res) => {
   res.send("Website is Live");
 });
@@ -146,7 +148,49 @@ app.get("/google/callback", (req, res, next) => {
 }); */
 
 // Signup route
-app.post("/signup", async (req, res) => {
+app.post("/signup-verify", async (req, res) => {
+  const { firstname, lastname, email, password, otp } = req.body;
+
+  try {
+    // Check if OTP is valid
+    if (otpStore[email] && otpStore[email] === otp) {
+      delete otpStore[email]; // OTP is valid, remove it from the store
+
+      // Encrypt the password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Check if the email already exists
+      const checkEmailQuery = "SELECT * FROM users WHERE email = $1";
+      const checkEmailResult = await db.query(checkEmailQuery, [email]);
+
+      if (checkEmailResult.rows.length > 0) {
+        return res.status(400).json({ error: "User already exists" });
+      }
+
+      // Insert the new user into the database
+      const values = [firstname, lastname, email, hashedPassword];
+      const sql =
+        "INSERT INTO users (firstname, lastname, email, password) VALUES ($1, $2, $3, $4)";
+
+      db.query(sql, values, (err, result) => {
+        if (err) {
+          console.error("Error executing SQL query:", err);
+          return res.status(500).json({ error: "An error occurred while saving data." });
+        }
+        console.log("Rows affected:", result.rowCount);
+        console.log("Data inserted successfully:", result.rows);
+        return res.status(200).json({ success: true });
+      });
+    } else {
+      res.status(400).send("Invalid OTP");
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error verifying OTP");
+  }
+});
+
+{ /* app.post("/signup", async (req, res) => {
   const { firstname, lastname, email, password } = req.body;
 
   try {
@@ -182,7 +226,7 @@ app.post("/signup", async (req, res) => {
       .status(500)
       .json({ error: "An error occurred while encrypting password." });
   }
-});
+}); */ }
 
 // Signin route
 app.post("/signin", async (req, res) => {
@@ -248,8 +292,6 @@ app.post("/updatepassword", async (req, res) => {
 });
 
 // OTP generation and sending route
-const otpStore = {};
-
 app.post("/generate-otp", async (req, res) => {
   const { email } = req.body;
 
