@@ -20,6 +20,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://kharthikasarees.onrender.com",
   "https://kharthikasarees.com",
+  "https://main.d25pcd4hyn5vqx.amplifyapp.com	",
 ];
 
 app.use(
