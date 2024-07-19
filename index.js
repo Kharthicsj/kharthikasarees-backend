@@ -148,29 +148,49 @@ app.get("/google/callback", (req, res, next) => {
 }); */
 
 // Signup route
+app.post("/check-email", async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    const checkEmailQuery = "SELECT * FROM users WHERE email = $1";
+    const checkEmailResult = await db.query(checkEmailQuery, [email]);
+
+    if (checkEmailResult.rows.length > 0) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error checking email");
+  }
+});
+
 app.post("/signup-verify", async (req, res) => {
   const { firstname, lastname, email, password, otp } = req.body;
 
+  // Convert email to lowercase
+  const emailLower = email.toLowerCase();
+
   try {
     // Check if OTP is valid
-    if (otpStore[email] && otpStore[email] === otp) {
-      delete otpStore[email]; // OTP is valid, remove it from the store
+    if (otpStore[emailLower] && otpStore[emailLower] === otp) {
+      delete otpStore[emailLower]; // OTP is valid, remove it from the store
 
       // Encrypt the password
       const hashedPassword = await bcrypt.hash(password, 10);
 
       // Check if the email already exists
       const checkEmailQuery = "SELECT * FROM users WHERE email = $1";
-      const checkEmailResult = await db.query(checkEmailQuery, [email]);
+      const checkEmailResult = await db.query(checkEmailQuery, [emailLower]);
 
       if (checkEmailResult.rows.length > 0) {
         return res.status(400).json({ error: "User already exists" });
       }
 
       // Insert the new user into the database
-      const values = [firstname, lastname, email, hashedPassword];
-      const sql =
-        "INSERT INTO users (firstname, lastname, email, password) VALUES ($1, $2, $3, $4)";
+      const values = [firstname, lastname, emailLower, hashedPassword];
+      const sql = "INSERT INTO users (firstname, lastname, email, password) VALUES ($1, $2, $3, $4)";
 
       db.query(sql, values, (err, result) => {
         if (err) {
@@ -189,6 +209,7 @@ app.post("/signup-verify", async (req, res) => {
     res.status(500).send("Error verifying OTP");
   }
 });
+
 
 { /* app.post("/signup", async (req, res) => {
   const { firstname, lastname, email, password } = req.body;
@@ -234,9 +255,10 @@ app.post("/signin", async (req, res) => {
   console.log("Received data:", req.body);
 
   try {
-    const result = await db.query("SELECT * FROM users WHERE email = $1", [
-      email,
-    ]);
+    // Convert email to lowercase
+    const lowerCaseEmail = email.toLowerCase();
+
+    const result = await db.query("SELECT * FROM users WHERE email = $1", [lowerCaseEmail]);
     console.log(result.rows);
 
     if (result.rows.length > 0) {
@@ -265,6 +287,7 @@ app.post("/signin", async (req, res) => {
       .json({ error: "An error occurred while processing the request." });
   }
 });
+
 
 // Update password route
 app.post("/updatepassword", async (req, res) => {
