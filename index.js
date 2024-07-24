@@ -153,8 +153,11 @@ app.post("/check-email", async (req, res) => {
   const { email } = req.body;
 
   try {
+    // Convert email to lowercase for consistent comparison
+    const lowerCaseEmail = email.toLowerCase();
+
     const checkEmailQuery = "SELECT * FROM users WHERE email = $1";
-    const checkEmailResult = await db.query(checkEmailQuery, [email]);
+    const checkEmailResult = await db.query(checkEmailQuery, [lowerCaseEmail]);
 
     if (checkEmailResult.rows.length > 0) {
       return res.status(400).json({ error: "User already exists" });
@@ -163,9 +166,10 @@ app.post("/check-email", async (req, res) => {
     res.status(200).json({ success: true });
   } catch (error) {
     console.error(error);
-    res.status(500).send("Error checking email");
+    res.status(500).json({ error: "Error checking email" });
   }
 });
+
 
 app.post("/signup-verify", async (req, res) => {
   const { firstname, lastname, email, password, otp } = req.body;
@@ -426,6 +430,7 @@ app.get("/api/user", async (req, res) => {
       .status(500)
       .json({ error: "An error occurred while fetching user data" });
   }
+
 });
 
 app.get("/api/get-order-details", async (req, res) => {
@@ -774,6 +779,73 @@ app.post("/newsletter", async (req, res) => {
       .json({ message: "Failed to subscribe. Please try again." });
   }
 });
+
+/*  ADMIN PANEL WORKFLOWS STARTS FROM HERE 
+
+*/
+
+app.get('/api/full-users', async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM users');
+    res.status(200).json(result.rows); // Ensure this returns an array of user objects
+  } catch (err) {
+    console.error('Error fetching user data:', err);
+    res.status(500).json({ error: 'An error occurred while fetching user data' });
+  }
+});
+
+app.get('/api/order-table', async(req,res) => {
+  try{
+    const result = await db.query('SELECT * FROM orders');
+    res.status(200).json(result.rows);
+  }catch(err){
+    console.error('Error fetching order table : ', err)
+    res.status(500).json({ error: 'An error occurred while fetching orders data' })
+  }
+});
+
+app.put('/api/order-status', async (req, res) => {
+  const { transaction_id, status } = req.body;
+
+  try {
+    await db.query('UPDATE orders SET status = $1 WHERE transaction_id = $2', [status, transaction_id]);
+    res.status(200).json({ message: 'Order status updated successfully' });
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({ error: 'An error occurred while updating order status' });
+  }
+});
+
+app.post("/admin-login", async (req, res) => {
+  const { email, password } = req.body;
+  console.log("Received data:", req.body);
+
+  try {
+    const lowerCaseEmail = email.toLowerCase();
+    const result = await db.query("SELECT * FROM admin_users WHERE email = $1", [lowerCaseEmail]);
+    console.log(result.rows);
+
+    if (result.rows.length > 0) {
+      const user = result.rows[0];
+      console.log(user);
+
+      if (password === user.password) {
+        res.json({ email: user.email, firstName: user.firstname }); // Ensure email and firstname are sent in the response
+        console.log("Successful Login");
+      } else {
+        res.status(401).json({ error: "Incorrect Password" });
+        console.log("Incorrect Password");
+      }
+    } else {
+      res.status(404).json({ error: "User not found" });
+      console.log("User not found");
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "An error occurred while processing the request." });
+  }
+});
+
 
 // Listen on port 4000
 const port = 4000;
