@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
-import pg from "pg";
+import pkg from "pg";
 import session from "express-session";
 import passport from "passport";
 import env from "dotenv";
@@ -14,6 +14,8 @@ import crypto from "crypto";
 
 // Load environment variables
 env.config();
+
+const { Pool } = pkg;
 
 const app = express();
 const allowedOrigins = [
@@ -36,15 +38,11 @@ app.use(
   })
 );
 
-const db = new pg.Client({
-  user: process.env.PG_USER,
-  host: process.env.PG_HOST,
-  database: process.env.PG_DATABASE,
-  password: process.env.PG_PASSWORD,
-  port: process.env.PG_PORT,
+const db = new Pool({
+  connectionString: process.env.DATABASE_URL,
   ssl: {
-    rejectUnauthorized: false, // This is generally used for self-signed certificates
-  },
+      rejectUnauthorized: false
+  }
 });
 
 db.connect((err) => {
